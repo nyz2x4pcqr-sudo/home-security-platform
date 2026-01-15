@@ -1,0 +1,49 @@
+# Home Security Platform Configuration Example
+
+# Camera configurations
+cameras: []
+  # Examples:
+  # - name: "Front Door"
+  #   type: "rtsp"
+  #   url: "rtsp://username:password@camera-ip:554/stream"
+  #   onvif_url: "http://camera-ip:80/onvif/device_service"
+  # - name: "USB Cam 1"
+  #   type: "usb"
+  #   device: 0
+  # Auto-discover cameras (ONVIF and USB)
+  # auto_discover: true
+
+# User accounts
+users:
+  - username: admin
+    password_hash: "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6fYzYXQK2"  # Hash of 'admin'
+    role: admin
+  # - username: viewer
+  #   password_hash: "$2b$12$..."  # Hash of viewer password
+  #   role: viewer
+
+# Motion detection zones (per camera)
+motion_zones: {}
+  # Example:
+  # "Front Door":
+  #   - x: 0.1
+  #     y: 0.1
+  #     width: 0.8
+  #     height: 0.8
+  #     sensitivity: 0.5
+
+# Recording settings
+recording:
+  continuous: true
+  event_triggered: true
+  retention_days: 30
+  resolution: "720p"
+
+# Network settings
+network:
+  allow_outbound: false
+
+# Event settings
+events:
+  motion_alert: true
+  camera_offline_alert: true

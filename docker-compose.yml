@@ -1,0 +1,109 @@
+services:
+  event-bus:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - event-bus-data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - home-security
+
+  ingest:
+    build: ./services/ingest
+    restart: unless-stopped
+    depends_on:
+      event-bus:
+        condition: service_healthy
+    volumes:
+      - ./config:/config:ro
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+      - /dev/video3:/dev/video3
+      - /dev/video4:/dev/video4
+    environment:
+      EVENT_BUS_URL: ${EVENT_BUS_URL}
+      CONFIG_PATH: ${CONFIG_PATH}
+    networks:
+      - home-security
+
+  recorder:
+    build: ./services/recorder
+    restart: unless-stopped
+    depends_on:
+      event-bus:
+        condition: service_healthy
+      ingest:
+        condition: service_started
+    volumes:
+      - ./config:/config:ro
+      - data:/data
+    environment:
+      EVENT_BUS_URL: ${EVENT_BUS_URL}
+      CONFIG_PATH: ${CONFIG_PATH}
+      RECORDINGS_PATH: ${RECORDINGS_PATH}
+    networks:
+      - home-security
+
+  motion:
+    build: ./services/motion
+    restart: unless-stopped
+    depends_on:
+      event-bus:
+        condition: service_healthy
+      recorder:
+        condition: service_started
+    volumes:
+      - ./config:/config:ro
+    environment:
+      EVENT_BUS_URL: ${EVENT_BUS_URL}
+      CONFIG_PATH: ${CONFIG_PATH}
+    networks:
+      - home-security
+
+  api:
+    build: ./services/api
+    restart: unless-stopped
+    ports:
+      - "${API_EXTERNAL_PORT:-8000}:${API_PORT}"
+    depends_on:
+      event-bus:
+        condition: service_healthy
+    volumes:
+      - ./config:/config:ro
+      - data:/data
+    environment:
+      EVENT_BUS_URL: ${EVENT_BUS_URL}
+      CONFIG_PATH: ${CONFIG_PATH}
+      DATA_PATH: ${DATA_PATH}
+    networks:
+      - home-security
+
+  web-ui:
+    build: ./web-ui
+    restart: unless-stopped
+    ports:
+      - "${WEB_UI_EXTERNAL_PORT:-8080}:${WEB_UI_PORT}"
+    depends_on:
+      - api
+    networks:
+      - home-security
+
+volumes:
+  event-bus-data:
+  data:
+
+networks:
+  home-security:
+    driver: bridge

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Security Platform</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .login { display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .login input { display: block; margin: 10px 0; padding: 10px; width: 100%; }
+        .login button { padding: 10px; width: 100%; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .nav { background: #333; color: white; padding: 10px 0; }
+        .nav ul { list-style: none; padding: 0; margin: 0; display: flex; justify-content: center; }
+        .nav li { margin: 0 20px; }
+        .nav a { color: white; text-decoration: none; }
+        .nav a.active { font-weight: bold; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .camera-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .video { width: 100%; height: 300px; background: #000; }
+        .recordings { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .recording-item { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); cursor: pointer; }
+        .logout { position: absolute; top: 10px; right: 20px; background: #dc3545; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; }
+        .management form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .management input { display: block; margin: 10px 0; padding: 10px; width: 100%; }
+        .management button { padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+        @media (max-width: 768px) {
+            .nav ul { flex-direction: column; }
+            .nav li { margin: 10px 0; }
+            .dashboard { grid-template-columns: 1fr; }
+            .camera-grid { grid-template-columns: 1fr; }
+            .recordings { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <div id="login" class="login">
+        <form id="loginForm">
+            <h2>Login</h2>
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+    <div id="app" style="display: none;">
+        <nav class="nav">
+            <ul>
+                <li><a href="#" data-section="dashboard" class="active">Dashboard</a></li>
+                <li><a href="#" data-section="live">Live Views</a></li>
+                <li><a href="#" data-section="recordings">Recordings</a></li>
+                <li><a href="#" data-section="management">Management</a></li>
+            </ul>
+        </nav>
+        <button class="logout" id="logout">Logout</button>
+        <div class="container">
+            <section id="dashboard" class="section active">
+                <h1>Dashboard</h1>
+                <div class="dashboard">
+                    <div class="card">
+                        <h3>System Status</h3>
+                        <p id="status">Loading...</p>
+                    </div>
+                    <div class="card">
+                        <h3>Recent Events</h3>
+                        <ul id="events"></ul>
+                    </div>
+                </div>
+            </section>
+            <section id="live" class="section">
+                <h1>Live Camera Views</h1>
+                <div id="cameras" class="camera-grid"></div>
+            </section>
+            <section id="recordings" class="section">
+                <h1>Recordings</h1>
+                <div id="recordingsList" class="recordings"></div>
+            </section>
+            <section id="management" class="section">
+                <h1>Camera Management</h1>
+                <form id="addCameraForm">
+                    <h3>Add Camera</h3>
+                    <input type="text" id="cameraName" placeholder="Camera Name" required>
+                    <input type="text" id="cameraUrl" placeholder="Stream URL" required>
+                    <button type="submit">Add Camera</button>
+                </form>
+                <h3>Current Cameras</h3>
+                <ul id="cameraList"></ul>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        let authCredentials = null;
+
+        function btoa(str) {
+            return btoa(str);
+        }
+
+        function getAuthHeader() {
+            if (!authCredentials) return {};
+            return { 'Authorization': 'Basic ' + btoa(authCredentials.username + ':' + authCredentials.password) };
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            authCredentials = { username, password };
+            try {
+                const response = await fetch('/api/cameras', { headers: getAuthHeader() });
+                if (response.ok) {
+                    document.getElementById('login').style.display = 'none';
+                    document.getElementById('app').style.display = 'block';
+                    loadDashboard();
+                } else {
+                    alert('Invalid credentials');
+                }
+            } catch (error) {
+                alert('Login failed');
+            }
+        });
+
+        document.getElementById('logout').addEventListener('click', function() {
+            authCredentials = null;
+            document.getElementById('login').style.display = 'flex';
+            document.getElementById('app').style.display = 'none';
+        });
+
+        document.querySelectorAll('.nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const section = this.getAttribute('data-section');
+                document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+                document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+                document.getElementById(section).classList.add('active');
+                this.classList.add('active');
+                if (section === 'dashboard') loadDashboard();
+                if (section === 'live') loadCameras();
+                if (section === 'recordings') loadRecordings();
+                if (section === 'management') loadCameraManagement();
+            });
+        });
+
+        async function loadDashboard() {
+            try {
+                const statusResponse = await fetch('/api/health');
+                const statusData = await statusResponse.json();
+                document.getElementById('status').textContent = 'API Status: ' + statusData.status;
+
+                const eventsResponse = await fetch('/api/events', { headers: getAuthHeader() });
+                const eventsData = await eventsResponse.json();
+                const eventsUl = document.getElementById('events');
+                eventsUl.innerHTML = '';
+                eventsData.events.forEach(event => {
+                    const li = document.createElement('li');
+                    li.textContent = event.description || 'Event';
+                    eventsUl.appendChild(li);
+                });
+                if (eventsData.events.length === 0) {
+                    eventsUl.innerHTML = '<li>No recent events</li>';
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error loading status';
+            }
+        }
+
+        async function loadCameras() {
+            try {
+                const response = await fetch('/api/cameras', { headers: getAuthHeader() });
+                const data = await response.json();
+                const camerasDiv = document.getElementById('cameras');
+                camerasDiv.innerHTML = '';
+                data.cameras.forEach(camera => {
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `
+                        <h3>${camera.name}</h3>
+                        <video class="video" controls>
+                            <source src="${camera.url}" type="application/x-rtsp">
+                            Your browser does not support the video tag.
+                        </video>
+                    `;
+                    camerasDiv.appendChild(div);
+                });
+            } catch (error) {
+                document.getElementById('cameras').innerHTML = '<p>Error loading cameras</p>';
+            }
+        }
+
+        async function loadRecordings() {
+            try {
+                const response = await fetch('/api/recordings', { headers: getAuthHeader() });
+                const data = await response.json();
+                const recordingsDiv = document.getElementById('recordingsList');
+                recordingsDiv.innerHTML = '';
+                data.recordings.forEach(recording => {
+                    const div = document.createElement('div');
+                    div.className = 'recording-item';
+                    div.innerHTML = `<p>${recording}</p>`;
+                    div.addEventListener('click', () => playRecording(recording));
+                    recordingsDiv.appendChild(div);
+                });
+            } catch (error) {
+                document.getElementById('recordingsList').innerHTML = '<p>Error loading recordings</p>';
+            }
+        }
+
+        function playRecording(filename) {
+            // Assume recordings are served at /recordings/filename
+            const video = document.createElement('video');
+            video.src = `/recordings/${filename}`;
+            video.controls = true;
+            video.style.width = '100%';
+            video.style.height = '400px';
+            const modal = document.createElement('div');
+            modal.style.position = 'fixed';
+            modal.style.top = '0';
+            modal.style.left = '0';
+            modal.style.width = '100%';
+            modal.style.height = '100%';
+            modal.style.background = 'rgba(0,0,0,0.8)';
+            modal.style.display = 'flex';
+            modal.style.justifyContent = 'center';
+            modal.style.alignItems = 'center';
+            modal.appendChild(video);
+            modal.addEventListener('click', () => modal.remove());
+            document.body.appendChild(modal);
+        }
+
+        async function loadCameraManagement() {
+            try {
+                const response = await fetch('/api/cameras', { headers: getAuthHeader() });
+                const data = await response.json();
+                const cameraList = document.getElementById('cameraList');
+                cameraList.innerHTML = '';
+                data.cameras.forEach(camera => {
+                    const li = document.createElement('li');
+                    li.textContent = `${camera.name}: ${camera.url}`;
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.addEventListener('click', () => deleteCamera(camera.name));
+                    li.appendChild(deleteBtn);
+                    cameraList.appendChild(li);
+                });
+            } catch (error) {
+                document.getElementById('cameraList').innerHTML = '<li>Error loading cameras</li>';
+            }
+        }
+
+        document.getElementById('addCameraForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('cameraName').value;
+            const url = document.getElementById('cameraUrl').value;
+            try {
+                const response = await fetch('/api/cameras', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeader()
+                    },
+                    body: JSON.stringify({ name, url })
+                });
+                if (response.ok) {
+                    alert('Camera added');
+                    document.getElementById('cameraName').value = '';
+                    document.getElementById('cameraUrl').value = '';
+                    loadCameraManagement();
+                } else {
+                    alert('Failed to add camera');
+                }
+            } catch (error) {
+                alert('Error adding camera');
+            }
+        });
+
+        async function deleteCamera(name) {
+            try {
+                const response = await fetch(`/api/cameras/${encodeURIComponent(name)}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeader()
+                });
+                if (response.ok) {
+                    alert('Camera deleted');
+                    loadCameraManagement();
+                } else {
+                    alert('Failed to delete camera');
+                }
+            } catch (error) {
+                alert('Error deleting camera');
+            }
+        }
+
+        // Initial load
+        loadDashboard();
+    </script>
+</body>
+</html>
